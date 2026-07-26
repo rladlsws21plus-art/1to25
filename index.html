@@ -30,6 +30,7 @@
             flex-direction: column;
             align-items: center;
             box-sizing: border-box;
+            position: relative;
         }
 
         h1 {
@@ -73,6 +74,7 @@
             height: 340px; /* 고정 크기 유지 */
             margin-bottom: 15px;
             box-sizing: border-box;
+            position: relative;
         }
 
         /* 숫자 블록 스타일 */
@@ -111,6 +113,30 @@
             box-shadow: none;
             cursor: default;
             color: transparent;
+        }
+
+        /* ⚠️ 패널티 알림 오버레이 (게임판 위에 표시) */
+        #penalty-overlay {
+            display: none;
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(225, 29, 72, 0.85);
+            border-radius: 12px;
+            z-index: 10;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            animation: pulse 0.3s ease-in-out;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.95); }
+            50% { transform: scale(1.02); }
+            100% { transform: scale(1); }
         }
 
         /* 시작 버튼 */
@@ -177,7 +203,13 @@
         </div>
 
         <!-- 5x5 게임판 -->
-        <div id="game-board"></div>
+        <div id="game-board">
+            <!-- 패널티 오버레이 -->
+            <div id="penalty-overlay">
+                <div>⚠️ 오답 패널티!</div>
+                <div style="font-size: 16px; margin-top: 5px;">1초 동안 정지됩니다</div>
+            </div>
+        </div>
 
         <!-- 시작 버튼 -->
         <button id="start-btn" onclick="startGame()">게임 시작</button>
@@ -200,15 +232,18 @@
         const startBtn = document.getElementById('start-btn');
         const resultModal = document.getElementById('result-modal');
         const finalTime = document.getElementById('final-time');
+        const penaltyOverlay = document.getElementById('penalty-overlay');
 
         let nextNum = 1;
         let timerInterval = null;
         let startTime = 0;
         let isPlaying = false;
+        let isPenalized = false; // 패널티 진행 중 여부
 
-        // 대기 화면 생성 (숫자 안 보임)
+        // 대기 화면 생성
         function renderEmptyBoard() {
             board.innerHTML = '';
+            board.appendChild(penaltyOverlay); // 오버레이 유지
             for (let i = 0; i < 25; i++) {
                 const btn = document.createElement('div');
                 btn.classList.add('num-btn', 'hidden-state');
@@ -216,12 +251,16 @@
             }
         }
 
-        // 게임 시작 ([시작] 버튼 누를 때만 실행)
+        // 게임 시작
         function startGame() {
             clearInterval(timerInterval);
             board.innerHTML = '';
+            board.appendChild(penaltyOverlay);
+            
             nextNum = 1;
             isPlaying = true;
+            isPenalized = false;
+            penaltyOverlay.style.display = 'none';
             
             nextNumDisplay.innerText = '1';
             timerDisplay.innerText = '0.00 초';
@@ -235,7 +274,7 @@
                 [nums[i], nums[j]] = [nums[j], nums[i]];
             }
 
-            // 숫자를 채워 넣고 버튼 생성
+            // 버튼 생성
             nums.forEach(num => {
                 const btn = document.createElement('div');
                 btn.classList.add('num-btn');
@@ -249,15 +288,16 @@
                 board.appendChild(btn);
             });
 
-            // 즉시 기록 시작
             startTimer();
         }
 
-        // 블록 터치 이벤트 처리
+        // 블록 터치 이벤트
         function handleTouch(btn, num) {
-            if (!isPlaying) return;
+            // 게임 중이 아니거나 이미 패널티 상태면 터치 입력 무시
+            if (!isPlaying || isPenalized) return;
 
             if (num === nextNum) {
+                // [정답]
                 btn.classList.add('cleared');
                 nextNum++;
 
@@ -266,10 +306,25 @@
                 } else {
                     endGame();
                 }
+            } else {
+                // [오답] - 패널티 발생!
+                triggerPenalty();
             }
         }
 
-        // 타이머 동작
+        // 1초 패널티 처리
+        function triggerPenalty() {
+            isPenalized = true;
+            penaltyOverlay.style.display = 'flex'; // 패널티 화면 덮기
+
+            // 1초 후 패널티 해제 (타이머는 멈추지 않고 계속 흐름)
+            setTimeout(() => {
+                penaltyOverlay.style.display = 'none';
+                isPenalized = false;
+            }, 1000);
+        }
+
+        // 타이머 동작 (0.01초 측정)
         function startTimer() {
             startTime = performance.now();
             timerInterval = setInterval(() => {
@@ -297,9 +352,10 @@
             timerDisplay.innerText = '0.00 초';
         }
 
-        // 최초 대기 상태 로드
+        // 최초 로드
         renderEmptyBoard();
     </script>
 
 </body>
 </html>
+
