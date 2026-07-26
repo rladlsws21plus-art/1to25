@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>1 to 25 스피드 터치</title>
+    <style>
+        /* 모바일 화면 정렬 및 스크롤 차단 */
+        html, body {
+            touch-action: manipulation;
+            -webkit-user-select: none;
+            user-select: none;
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background-color: #0f172a;
+            color: white;
+            font-family: 'Arial', 'Noto Sans KR', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #main-container {
+            width: 100%;
+            max-width: 340px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            box-sizing: border-box;
+        }
+
+        h1 {
+            margin: 0 0 10px 0;
+            font-size: 24px;
+        }
+
+        /* 상태 계측판 */
+        #dashboard {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            background-color: #1e293b;
+            padding: 12px 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            margin-bottom: 15px;
+            box-sizing: border-box;
+        }
+
+        .stat-box {
+            text-align: center;
+            font-size: 14px;
+            color: #94a3b8;
+        }
+
+        .stat-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #38bdf8;
+            margin-top: 2px;
+        }
+
+        /* 5x5 그리드 게임판 */
+        #game-board {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            grid-template-rows: repeat(5, 1fr);
+            gap: 8px;
+            width: 100%;
+            height: 340px; /* 고정 크기 유지 */
+            margin-bottom: 15px;
+            box-sizing: border-box;
+        }
+
+        /* 숫자 블록 스타일 */
+        .num-btn {
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            color: white;
+            font-size: 20px;
+            font-weight: bold;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.3);
+            box-sizing: border-box;
+            touch-action: none;
+            transition: background 0.1s;
+        }
+
+        /* 시작 전 대기 상태 (빈 블록) */
+        .num-btn.hidden-state {
+            background: #1e293b;
+            border: 2px dashed #334155;
+            box-shadow: none;
+            cursor: default;
+        }
+
+        .num-btn:active:not(.cleared):not(.hidden-state) {
+            transform: scale(0.95);
+        }
+
+        /* 눌린 블록 (크기 유지 및 투명화) */
+        .num-btn.cleared {
+            background: rgba(30, 41, 59, 0.4) !important;
+            border: 2px dashed #334155;
+            box-shadow: none;
+            cursor: default;
+            color: transparent;
+        }
+
+        /* 시작 버튼 */
+        #start-btn {
+            width: 100%;
+            padding: 14px 0;
+            font-size: 18px;
+            font-weight: bold;
+            border: none;
+            border-radius: 25px;
+            background: linear-gradient(135deg, #38bdf8, #0284c7);
+            color: white;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(2, 132, 199, 0.4);
+            touch-action: manipulation;
+        }
+
+        /* 결과 모달 */
+        #result-modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(15, 23, 42, 0.9);
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+
+        .modal-content {
+            background-color: #1e293b;
+            padding: 25px;
+            border-radius: 20px;
+            text-align: center;
+            border: 2px solid #38bdf8;
+            box-shadow: 0 0 25px rgba(56, 189, 248, 0.3);
+            width: 80%;
+            max-width: 300px;
+        }
+
+        .record-text {
+            font-size: 36px;
+            color: #facc15;
+            font-weight: bold;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="main-container">
+        <h1>🔢 1 to 25 스피드 터치</h1>
+
+        <!-- 계측판 -->
+        <div id="dashboard">
+            <div class="stat-box">
+                다음 숫자
+                <div id="next-num" class="stat-value">-</div>
+            </div>
+            <div class="stat-box">
+                경과 시간
+                <div id="timer-display" class="stat-value">0.00 초</div>
+            </div>
+        </div>
+
+        <!-- 5x5 게임판 -->
+        <div id="game-board"></div>
+
+        <!-- 시작 버튼 -->
+        <button id="start-btn" onclick="startGame()">게임 시작</button>
+    </div>
+
+    <!-- 결과 화면 -->
+    <div id="result-modal">
+        <div class="modal-content">
+            <h2>🎉 클리어!</h2>
+            <div>최종 기록</div>
+            <div id="final-time" class="record-text">0.00 초</div>
+            <button id="start-btn" onclick="closeModal()">다시 도전</button>
+        </div>
+    </div>
+
+    <script>
+        const board = document.getElementById('game-board');
+        const nextNumDisplay = document.getElementById('next-num');
+        const timerDisplay = document.getElementById('timer-display');
+        const startBtn = document.getElementById('start-btn');
+        const resultModal = document.getElementById('result-modal');
+        const finalTime = document.getElementById('final-time');
+
+        let nextNum = 1;
+        let timerInterval = null;
+        let startTime = 0;
+        let isPlaying = false;
+
+        // 대기 화면 생성 (숫자 안 보임)
+        function renderEmptyBoard() {
+            board.innerHTML = '';
+            for (let i = 0; i < 25; i++) {
+                const btn = document.createElement('div');
+                btn.classList.add('num-btn', 'hidden-state');
+                board.appendChild(btn);
+            }
+        }
+
+        // 게임 시작 ([시작] 버튼 누를 때만 실행)
+        function startGame() {
+            clearInterval(timerInterval);
+            board.innerHTML = '';
+            nextNum = 1;
+            isPlaying = true;
+            
+            nextNumDisplay.innerText = '1';
+            timerDisplay.innerText = '0.00 초';
+            startBtn.innerText = '게임 진행 중...';
+            startBtn.disabled = true;
+
+            // 1~25 숫자 셔플
+            let nums = Array.from({length: 25}, (_, i) => i + 1);
+            for (let i = nums.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [nums[i], nums[j]] = [nums[j], nums[i]];
+            }
+
+            // 숫자를 채워 넣고 버튼 생성
+            nums.forEach(num => {
+                const btn = document.createElement('div');
+                btn.classList.add('num-btn');
+                btn.innerText = num;
+
+                btn.addEventListener('pointerdown', (e) => {
+                    e.preventDefault();
+                    handleTouch(btn, num);
+                });
+
+                board.appendChild(btn);
+            });
+
+            // 즉시 기록 시작
+            startTimer();
+        }
+
+        // 블록 터치 이벤트 처리
+        function handleTouch(btn, num) {
+            if (!isPlaying) return;
+
+            if (num === nextNum) {
+                btn.classList.add('cleared');
+                nextNum++;
+
+                if (nextNum <= 25) {
+                    nextNumDisplay.innerText = nextNum;
+                } else {
+                    endGame();
+                }
+            }
+        }
+
+        // 타이머 동작
+        function startTimer() {
+            startTime = performance.now();
+            timerInterval = setInterval(() => {
+                const elapsed = (performance.now() - startTime) / 1000;
+                timerDisplay.innerText = `${elapsed.toFixed(2)} 초`;
+            }, 10);
+        }
+
+        // 게임 클리어
+        function endGame() {
+            clearInterval(timerInterval);
+            isPlaying = false;
+            startBtn.disabled = false;
+            startBtn.innerText = '다시 시작';
+
+            const totalTime = ((performance.now() - startTime) / 1000).toFixed(2);
+            finalTime.innerText = `${totalTime} 초`;
+            resultModal.style.display = 'flex';
+        }
+
+        function closeModal() {
+            resultModal.style.display = 'none';
+            renderEmptyBoard();
+            nextNumDisplay.innerText = '-';
+            timerDisplay.innerText = '0.00 초';
+        }
+
+        // 최초 대기 상태 로드
+        renderEmptyBoard();
+    </script>
+
+</body>
+</html>
